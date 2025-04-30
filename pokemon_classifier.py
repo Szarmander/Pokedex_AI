@@ -12,8 +12,14 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropou
 # Mapowanie Pokémonów na ich kategorie w archiwum Bulbagarden
 POKEMON_CATEGORIES = {
     "Charmander": "https://m.archives.bulbagarden.net/wiki/Category:Charmander",
+    "Charmeleon": "https://m.archives.bulbagarden.net/wiki/Category:Charmeleon",
+    "Charizard": "https://m.archives.bulbagarden.net/wiki/Category:Charizard",
     "Squirtle": "https://m.archives.bulbagarden.net/wiki/Category:Squirtle",
+    "Wartortle": "https://m.archives.bulbagarden.net/wiki/Category:Wartortle",
+    "Blastoise": "https://m.archives.bulbagarden.net/wiki/Category:Blastoise",
     "Bulbasaur": "https://m.archives.bulbagarden.net/wiki/Category:Bulbasaur",
+    "Ivysaur": "https://m.archives.bulbagarden.net/wiki/Category:Ivysaur",
+    "Venusaur": "https://m.archives.bulbagarden.net/wiki/Category:Venusaur",
     "Pikachu": "https://m.archives.bulbagarden.net/wiki/Category:Pikachu"
 }
 
