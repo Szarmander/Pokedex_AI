@@ -7,29 +7,31 @@ from PIL import Image
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras import layers, models, callbacks
+from tensorflow.keras.optimizers import Adam
 
 # Konfiguracja
 POKEMON_CATEGORIES = {
-    "Charmander": "https://m.archives.bulbagarden.net/wiki/Category:Charmander",
-    "Charmeleon": "https://m.archives.bulbagarden.net/wiki/Category:Charmeleon",
-    "Charizard": "https://m.archives.bulbagarden.net/wiki/Category:Charizard",
-    "Squirtle": "https://m.archives.bulbagarden.net/wiki/Category:Squirtle",
-    "Wartortle": "https://m.archives.bulbagarden.net/wiki/Category:Wartortle",
     "Blastoise": "https://m.archives.bulbagarden.net/wiki/Category:Blastoise",
     "Bulbasaur": "https://m.archives.bulbagarden.net/wiki/Category:Bulbasaur",
+    "Charizard": "https://m.archives.bulbagarden.net/wiki/Category:Charizard",
+    "Charmander": "https://m.archives.bulbagarden.net/wiki/Category:Charmander",
+    "Charmeleon": "https://m.archives.bulbagarden.net/wiki/Category:Charmeleon",
     "Ivysaur": "https://m.archives.bulbagarden.net/wiki/Category:Ivysaur",
+    "Pikachu": "https://m.archives.bulbagarden.net/wiki/Category:Pikachu",
+    "Squirtle": "https://m.archives.bulbagarden.net/wiki/Category:Squirtle",
     "Venusaur": "https://m.archives.bulbagarden.net/wiki/Category:Venusaur",
-    "Pikachu": "https://m.archives.bulbagarden.net/wiki/Category:Pikachu"
+    "Wartortle": "https://m.archives.bulbagarden.net/wiki/Category:Wartortle",
+
 }
-DATASET_DIR = "data/pokemon_dataset"
+DATASET_DIR = os.path.expanduser("~/Downloads/dataset")
 TARGET_SIZE = (128, 128)
 HEADERS = {"User-Agent": "Mozilla/5.0"}
+LEARNING_RATE = 0.001  # Nowa stała dla learning rate
 
-# Funkcja do pobierania obrazów
+# Funkcja do pobierania obrazów (bez zmian)
 def download_images(pokemon_name, url):
     folder_path = os.path.join(DATASET_DIR, pokemon_name)
     
-    # Sprawdź czy folder istnieje i ma wystarczająco obrazów
     if os.path.exists(folder_path) and len([f for f in os.listdir(folder_path) if f.endswith(('.jpg', '.png', '.jpeg'))]) >= 30:
         print(f"Pomijam {pokemon_name} - wystarczająca liczba obrazów istnieje")
         return
@@ -47,7 +49,7 @@ def download_images(pokemon_name, url):
         images_downloaded = 0
         
         for img in soup.find_all("img"):
-            if images_downloaded >= 50:  # Limit na Pokémona
+            if images_downloaded >= 50:
                 break
                 
             img_url = img.get("src")
@@ -56,7 +58,6 @@ def download_images(pokemon_name, url):
 
             img_url = "https:" + img_url if img_url.startswith("//") else urljoin(url, img_url)
             
-            # Pobieraj tylko obrazy
             if not any(img_url.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png']):
                 continue
                 
@@ -75,7 +76,7 @@ def download_images(pokemon_name, url):
     except Exception as e:
         print(f"Błąd podczas przetwarzania {pokemon_name}: {e}")
 
-# Funkcja do ładowania i przetwarzania danych
+# Funkcja do ładowania i przetwarzania danych (bez zmian)
 def load_and_preprocess_data():
     images = []
     labels = []
@@ -102,20 +103,44 @@ def load_and_preprocess_data():
     )
     return X_train, X_test, y_train, y_test
 
-# Prosty model CNN
+# Zmodyfikowana funkcja budująca model z learning rate
 def build_simple_model(input_shape, num_classes):
+    # model = models.Sequential([
+    #     layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape),
+    #     layers.MaxPooling2D((3, 3)),
+    #     layers.Conv2D(64, (3, 3), activation='relu'),
+    #     layers.MaxPooling2D((3, 3)),
+    #     layers.Flatten(),
+    #     layers.Dense(128, activation='relu'),
+    #     layers.Dense(num_classes, activation='softmax')
+    # ])
+
     model = models.Sequential([
         layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape),
-        layers.MaxPooling2D((2, 2)),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((3, 3)),
+
         layers.Conv2D(64, (3, 3), activation='relu'),
-        layers.MaxPooling2D((2, 2)),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((3, 3)),
+        layers.Dropout(0.3),
+
+        layers.Conv2D(128, (3, 3), activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((3, 3)),
+        layers.Dropout(0.3),
+
         layers.Flatten(),
-        layers.Dense(128, activation='relu'),
+        layers.Dense(256, activation='relu'),
+        layers.Dropout(0.5),
         layers.Dense(num_classes, activation='softmax')
     ])
     
+    # Użycie optymalizatora Adam z custom learning rate
+    optimizer = Adam(learning_rate=LEARNING_RATE)
+    
     model.compile(
-        optimizer='adam',
+        optimizer=optimizer,
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
@@ -142,28 +167,28 @@ def main():
     # Callbacki
     callbacks_list = [
         callbacks.EarlyStopping(patience=10, restore_best_weights=True),
-        # Używamy teraz tylko ModelCheckpoint z nazwą docelową
         callbacks.ModelCheckpoint("simple_pokemon_model.keras", 
                                 save_best_only=True,
                                 monitor='val_accuracy',
-                                mode='max')
+                                mode='max'),
+        # Dodatkowo możemy dodać redukcję learning rate
+        callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=5)
     ]
     
     print("\nRozpoczęcie treningu...")
+    print(f"Używany learning rate: {LEARNING_RATE}")
     history = model.fit(
         X_train, y_train,
         validation_data=(X_test, y_test),
         epochs=50,
-        batch_size=32,
+        batch_size=16,
         callbacks=callbacks_list
     )
     
-    # 5. Ewaluacja (używamy już zapisanego najlepszego modelu)
+    # 5. Ewaluacja
     print("\nOcena najlepszego modelu:")
     best_model = tf.keras.models.load_model("simple_pokemon_model.keras")
     best_model.evaluate(X_test, y_test)
-
-    # NIE zapisujemy ponownie - już mamy najlepszą wersję
 
     model.save("xd.keras")
 
